@@ -58,13 +58,20 @@ opening it.
 ```jsonc
 {
   "file": "plays_2025.db.gz",
-  "sha256": "…",
-  "bytes": 14680064,
+  "sha256": "…",        // of the .db.gz — verify your download against this
+  "content_hash": "…",  // of the source data — use this to detect real changes
+  "bytes": 15004718,
   "rows": 48771,
   "seasons": [2025],
   "columns": 337
 }
 ```
+
+Two hashes, deliberately. `sha256` covers the compressed artifact, so a client can
+verify what it downloaded. `content_hash` covers the nflverse source files, so it
+only moves when the underlying data does — the gzip and SQLite bytes shift with
+the zlib and SQLite versions on the build machine, which would otherwise look
+like a change on every runner-image update.
 
 ## Schedule
 

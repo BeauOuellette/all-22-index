@@ -75,7 +75,12 @@ SKIP = re.compile(
     r"|^(stadium|weather|surface|roof|time_of_day|start_time|nfl_api_id)")
 
 
+SOURCES = []          # source files this build consumed
+
+
 def fetch(url, path):
+    if path not in SOURCES:
+        SOURCES.append(path)
     if os.path.exists(path):
         print("  cached  %s" % os.path.basename(path)); return
     print("  fetching %s" % os.path.basename(path))
@@ -245,10 +250,24 @@ def publish(seasons):
         with gzip.GzipFile(filename="", mode="wb", compresslevel=9, fileobj=raw, mtime=0) as g:
             shutil.copyfileobj(f, g)
     h = hashlib.sha256(open(gz, "rb").read()).hexdigest()
+
+    # The gzip/SQLite bytes depend on the zlib and SQLite builds, so the same
+    # data hashes differently on a different Python. Fingerprint the SOURCE
+    # files instead: that is what "did the data change" actually means, and it
+    # survives runner-image updates that would otherwise force a pointless
+    # 15 MB re-download for every consumer.
+    src = hashlib.sha256()
+    for path in sorted(p for p in SOURCES if os.path.exists(p)):
+        src.update(os.path.basename(path).encode())
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                src.update(chunk)
+    content = src.hexdigest()
     con = sqlite3.connect(DB)
     manifest = {
         "file": name,
-        "sha256": h,
+        "sha256": h,            # of the .db.gz, for the client to verify
+        "content_hash": content,  # of the inputs, for change detection
         "bytes": os.path.getsize(gz),
         "rows": con.execute("SELECT COUNT(*) FROM plays").fetchone()[0],
         "seasons": [int(s) for s in seasons],
@@ -257,7 +276,8 @@ def publish(seasons):
     con.close()
     with open(os.path.join(out, "manifest.json"), "w") as f:
         json.dump(manifest, f, indent=2)
-    print("  artifact: %s (%.1f MB gz)  sha256 %s..." % (name, manifest["bytes"] / 1e6, h[:12]))
+    print("  artifact: %s (%.1f MB gz)  sha256 %s…  content %s…"
+          % (name, manifest["bytes"] / 1e6, h[:10], content[:10]))
 
 
 if __name__ == "__main__":

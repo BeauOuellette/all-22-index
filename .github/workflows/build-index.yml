@@ -31,9 +31,12 @@ jobs:
       - name: Compare with the published manifest
         id: diff
         run: |
-          NEW=$(python3 -c "import json;print(json.load(open('data/dist/manifest.json'))['sha256'])")
+          # compare content_hash, not sha256: the gzip/SQLite bytes shift whenever
+          # the runner's zlib or SQLite changes, which would republish identical
+          # data and make every consumer re-download 15 MB for nothing.
+          NEW=$(python3 -c "import json;print(json.load(open('data/dist/manifest.json'))['content_hash'])")
           OLD=$(curl -sfL "https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/manifest.json" \
-                | python3 -c "import json,sys;print(json.load(sys.stdin).get('sha256',''))" 2>/dev/null || echo "")
+                | python3 -c "import json,sys;print(json.load(sys.stdin).get('content_hash',''))" 2>/dev/null || echo "")
           echo "new=$NEW" >> "$GITHUB_OUTPUT"
           if [ "$NEW" = "$OLD" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
