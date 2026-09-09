@@ -1,0 +1,5 @@
+# Everything under data/ is downloaded or generated. The built artifacts are
+# distributed through GitHub Releases, never committed.
+data/
+__pycache__/
+*.pyc
