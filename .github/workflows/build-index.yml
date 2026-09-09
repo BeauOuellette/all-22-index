@@ -1,11 +1,11 @@
 name: build play index
 
 # nflverse republishes the whole season asset in place rather than shipping
-# per-game deltas, so we rebuild on a schedule and only publish when the
+# per-game deltas, so we rebuild on a schedule and publish only when the
 # resulting artifact actually changed.
 on:
   schedule:
-    - cron: "17 9 * * *"        # 09:17 UTC daily — after nflverse's own runs
+    - cron: "17 9 * * *"        # 09:17 UTC daily, after nflverse's own runs
   workflow_dispatch:
     inputs:
       seasons:
@@ -28,20 +28,36 @@ jobs:
       - name: Build index
         run: python3 build_index.py ${{ github.event.inputs.seasons || '2025' }}
 
-      - name: Compare with published manifest
+      - name: Compare with the published manifest
         id: diff
         run: |
           NEW=$(python3 -c "import json;print(json.load(open('data/dist/manifest.json'))['sha256'])")
-          OLD=$(curl -sfL https://github.com/${{ github.repository }}/releases/latest/download/manifest.json \
+          OLD=$(curl -sfL "https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/manifest.json" \
                 | python3 -c "import json,sys;print(json.load(sys.stdin).get('sha256',''))" 2>/dev/null || echo "")
-          echo "new=$NEW" >> $GITHUB_OUTPUT
+          echo "new=$NEW" >> "$GITHUB_OUTPUT"
           if [ "$NEW" = "$OLD" ]; then
-            echo "changed=false" >> $GITHUB_OUTPUT
-            echo "Index unchanged ($NEW) — nothing to publish."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Index unchanged ($NEW) - nothing to publish."
           else
-            echo "changed=true" >> $GITHUB_OUTPUT
-            echo "Index changed: $OLD -> $NEW"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Index changed: ${OLD:-none} -> $NEW"
           fi
+
+      - name: Write release notes
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          python3 - <<'PY' > notes.md
+          import json
+          m = json.load(open("data/dist/manifest.json"))
+          print("%d plays  ·  %d columns  ·  seasons %s"
+                % (m["rows"], m["columns"], ", ".join(map(str, m["seasons"]))))
+          print()
+          print("Built from nflverse play-by-play plus FTN charting.")
+          print("Consumers poll `manifest.json` and download only when the checksum changes.")
+          print()
+          print("    %s  (%.1f MB)" % (m["file"], m["bytes"] / 1e6))
+          print("    sha256 %s" % m["sha256"])
+          PY
 
       - name: Publish release
         if: steps.diff.outputs.changed == 'true'
@@ -54,11 +70,4 @@ jobs:
             data/dist/manifest.json data/dist/*.db.gz \
             --latest \
             --title "Play index $(date -u +%Y-%m-%d)" \
-            --notes "$(python3 -c "
-import json; m=json.load(open('data/dist/manifest.json'))
-print('%d plays · %d columns · seasons %s' % (m['rows'], m['columns'], ', '.join(map(str, m['seasons']))))
-print()
-print('Built from nflverse play-by-play. The extension polls this release and')
-print('downloads only when the sha256 changes.')
-print()
-print('sha256: %s' % m['sha256'])")"
+            --notes-file notes.md
