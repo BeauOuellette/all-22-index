@@ -10,7 +10,7 @@ on:
     inputs:
       seasons:
         description: "Seasons to build, space separated"
-        default: "2025"
+        default: "2025 2026"
 
 permissions:
   contents: write
@@ -25,8 +25,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      # The scheduled run gets no inputs, so this fallback -- not the
+      # workflow_dispatch default above -- is what the daily build uses.
+      # Add the new season here each September; nflverse publishes the
+      # season's pbp asset before week 1, and building a season it has not
+      # published yet fails the whole job.
       - name: Build index
-        run: python3 build_index.py ${{ github.event.inputs.seasons || '2025' }}
+        run: python3 build_index.py ${{ github.event.inputs.seasons || '2025 2026' }}
 
       - name: Compare with the published manifest
         id: diff
