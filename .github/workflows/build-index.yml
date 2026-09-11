@@ -3,9 +3,20 @@ name: build play index
 # nflverse republishes the whole season asset in place rather than shipping
 # per-game deltas, so we rebuild on a schedule and publish only when the
 # resulting artifact actually changed.
+#
+# nflverse's own updater (nflverse/nflverse-pbp, update_data.yaml) is cron'd at
+# 09:03 UTC daily and has been landing 09:30-10:00 UTC; its game-night runs
+# (TNF Fri, SNF/MNF Mon/Tue) fire 05:33 UTC, and Sunday's windows 22:03 UTC
+# Sun and 00:07 UTC Mon. GitHub then delays *our* scheduled runs by up to a
+# few hours, unpredictably. So: one slot right after their daily run has
+# settled, one catch-up in the afternoon for the days GitHub or nflverse ran
+# late, and one late Sunday night to pick up the day's games. A run that finds
+# nothing changed costs a couple of Actions minutes and publishes nothing.
 on:
   schedule:
-    - cron: "17 9 * * *"        # 09:17 UTC daily, after nflverse's own runs
+    - cron: "37 10 * * *"       # 10:37 UTC / 6:37 AM ET daily, after nflverse's 09:03 UTC run
+    - cron: "37 14 * * *"       # 14:37 UTC / 10:37 AM ET catch-up
+    - cron: "37 1 * * 1"        # Mon 01:37 UTC / Sun 9:37 PM ET, after the Sunday windows
   workflow_dispatch:
     inputs:
       seasons:
