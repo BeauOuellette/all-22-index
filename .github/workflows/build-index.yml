@@ -47,9 +47,9 @@ jobs:
       - name: Compare with the published manifest
         id: diff
         run: |
-          # compare content_hash, not sha256: the gzip/SQLite bytes shift whenever
-          # the runner's zlib or SQLite changes, which would republish identical
-          # data and make every consumer re-download 15 MB for nothing.
+          # content_hash is over every part's content id -- the rows, not the
+          # gzip/SQLite bytes, which shift whenever the runner's zlib or SQLite
+          # changes and would republish identical data for nothing.
           NEW=$(python3 -c "import json;print(json.load(open('data/dist/manifest.json'))['content_hash'])")
           OLD=$(curl -sfL "https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/manifest.json" \
                 | python3 -c "import json,sys;print(json.load(sys.stdin).get('content_hash',''))" 2>/dev/null || echo "")
@@ -72,10 +72,12 @@ jobs:
                 % (m["rows"], m["columns"], ", ".join(map(str, m["seasons"]))))
           print()
           print("Built from nflverse play-by-play plus FTN charting.")
-          print("Consumers poll `manifest.json` and download only when the checksum changes.")
+          print("Published as parts: one file per completed season, one per week of the")
+          print("newest season, one for players. Consumers poll `manifest.json` and")
+          print("download only the parts whose content id changed.")
           print()
-          print("    %s  (%.1f MB)" % (m["file"], m["bytes"] / 1e6))
-          print("    sha256 %s" % m["sha256"])
+          for p in m["parts"]:
+              print("    %-24s %7d rows  %6.2f MB  sha256 %s" % (p["file"], p["rows"], p["bytes"] / 1e6, p["sha256"][:16]))
           PY
 
       - name: Publish release
