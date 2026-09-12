@@ -4,7 +4,10 @@ Builds a compact, queryable SQLite index of NFL play-by-play and publishes it to
 GitHub Releases. A GitHub Action rebuilds it daily and cuts a new release only
 when the data actually changed.
 
-Consumers download one gzipped file and query it locally — no server, no API key.
+Consumers download gzipped SQLite parts — one per completed season, one per week of the
+newest season, one for players — and query them locally; no server, no API key. Each
+part carries a content id, so a consumer that keeps a merged copy fetches only the
+parts that changed.
 
 ## What's in it
 
@@ -29,6 +32,17 @@ how many indexed plays each player appears in.
 57 low-value columns are dropped by default (running score/EPA totals,
 per-outcome probability splits, venue metadata) — that's what takes a season
 from 101 MB to 64 MB. Pass `--full` to keep them.
+
+## Licence and attribution
+
+The published index is derived from [nflverse-data](https://github.com/nflverse/nflverse-data)
+(play-by-play and players) and the [FTN Data](https://www.ftndata.com/) charting
+that nflverse publishes, both under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The index is a
+modified form of that data (columns dropped, charting joined, loaded into
+SQLite) and is offered under the same licence: credit nflverse and FTN Data
+if you reuse it. `build_index.py` is MIT. Full text in [LICENSE.md](LICENSE.md).
+Not affiliated with nflverse, FTN Data, or the NFL.
 
 ## Build it yourself
 
